@@ -22,7 +22,9 @@ class ValidationSet:
     def load(self, dataset_dir):
         import glob
 
+        # Retrieve the path containing all validation images.
         abs_dirname = os.path.join(dataset_dir, '*')
+        # Compiles the file pattern to all file names of the images.
         fnames = sorted(glob.glob(abs_dirname))
         if len(fnames) == 0:
             print('\nERROR: No files found using the following glob pattern:', abs_dirname, '\n')
@@ -31,10 +33,14 @@ class ValidationSet:
         images = []
         for fname in fnames:
             try:
+                # In this loop, open every image in the RGB format.
                 im = PIL.Image.open(fname).convert('RGB')
+                # Convert the image to numpy array
                 arr = np.array(im, dtype=np.float32)
+                print(arr.shape)  # TODO: [h,w,3] ?
                 # Converts HWC to CHW and normalizes color values to range [-0.5, 0.5]
                 reshaped = arr.transpose([2, 0, 1]) / 255.0 - 0.5
+                # Appends transformed image array to the list of all images.
                 images.append(reshaped)
             except OSError as e:
                 print('Skipping file', fname, 'due to error: ', e)

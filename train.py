@@ -70,11 +70,17 @@ class AugmentTextOverlays:
 
 
 def compute_ramped_down_lrate(i, iteration_count, ramp_down_perc, learning_rate):
+    """Ramps down the learning rate dynamically depending on the iteration count.
+    TODO: why ramp down? Because you only want fine-tuning close to convergence."""
     # Calculates after which iteration to start the ramping down process.
+    # The higher the ramp_down_perc value, the earlier it starts to ramp down the learning rate.
     ramp_down_start_iter = iteration_count * (1 - ramp_down_perc)
     if i >= ramp_down_start_iter:
+        # the greater the ramp_down_perc, the faster the learning rate will be ramped down.
         t = ((i - ramp_down_start_iter) / ramp_down_perc) / iteration_count
+        # TODO: How does this work? What other ways/functions are there to ramp down the learning rate?
         smooth = (0.5+np.cos(t * np.pi)/2)**2
+        # Multiply the static starting learning rate with the dynamic factor to ramp it down.
         return learning_rate * smooth
     return learning_rate
 
@@ -97,6 +103,7 @@ def train(
     # and insert them into this parameter as dictionary entries.
     noise_augmenter = noise.func(**noise.func_kwargs)
     validation_set = ValidationSet(submit_config)
+    # Load all images for validation as numpy arrays to the images attribute of the validation set.
     validation_set.load(**validation_config)
 
     # Create a run context (hides low level details, exposes simple API to manage the run)
@@ -105,6 +112,9 @@ def train(
     # Initialize TensorFlow graph and session using good default settings
     tfutil.init_tf(tf_config)
 
+    # Creates the data set from the specified path to a generated tfrecords file containing all training images.
+    # Data set will be split into minibatches of the given size and augment the noise with given noise function.
+    # Use the dataset_tool_tf to create this tfrecords file.
     dataset_iter = create_dataset(train_tfrecords, minibatch_size, noise_augmenter.add_train_noise_tf)
 
     # Construct the network using the Network helper class and a function defined in config.net_config

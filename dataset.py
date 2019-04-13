@@ -23,13 +23,16 @@ def hwc_to_chw(x):
 
 
 def resize_small_image(x):
+    """If the image is smaller than 256*256, extend it to fit to the size of 256*256."""
     shape = tf.shape(x)
     return tf.cond(
         tf.logical_or(
             tf.less(shape[2], 256),
             tf.less(shape[1], 256)
         ),
+        # Resize if too small.
         true_fn=lambda: hwc_to_chw(tf.image.resize_images(chw_to_hwc(x), size=[256, 256], method=tf.image.ResizeMethod.BICUBIC)),
+        # Otherwise just make sure image is of type float32.
         false_fn=lambda: tf.cast(x, tf.float32)
      )
 
@@ -37,7 +40,9 @@ def resize_small_image(x):
 # crop image and return a 3-tuple with this crop, 2x with added random noise and once clean
 # result means: noisy input, noisy target, clean target
 def random_crop_noised_clean(x: tf.Tensor, add_noise: Callable) -> tuple:
+    # Randomly crops an 256*256 image to fit into the input layer and normalizes RGB pixel values.
     cropped = tf.random_crop(resize_small_image(x), size=[3, 256, 256]) / 255.0 - 0.5
+    # TODO: Make more crops as training data.
     return add_noise(cropped), add_noise(cropped), cropped
 
 
