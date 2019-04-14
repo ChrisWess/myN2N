@@ -14,7 +14,8 @@ from typing import Any, Union
 class EasyDict(dict):
     """Convenience class that behaves like a dict but allows access with the attribute syntax,
     because __getattr__, __setattr__ and __delattr__ handle any attribute that does not actually
-    exist in a class."""
+    exist in a class.
+    Internally translates the attribute name to its string representation and uses it as key for the dict."""
 
     def __getattr__(self, name: str) -> Any:
         try:
