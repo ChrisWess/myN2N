@@ -24,6 +24,7 @@ def apply_bias(x):
 
 
 def conv2d_bias(x, fmaps, kernel, gain=np.sqrt(2)):
+    # kernel size needs to be greater-equals 1 and have an odd size.
     assert kernel >= 1 and kernel % 2 == 1
     w = get_weight([kernel, kernel, x.shape[1].value, fmaps], gain=gain)
     w = tf.cast(w, x.dtype)

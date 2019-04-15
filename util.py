@@ -55,6 +55,9 @@ def infer_image(net, img):
     pw, ph = (w+31)//32*32-w, (h+31)//32*32-h
     padded_img = img
     if pw != 0 or ph != 0:
+        # (0, 0) => pad nothing in the channel axis
+        # (0, ph) => pad nothing before the height, pad "ph" number of values after the image height.
+        # (0, pw) => pad nothing before the width, pad "pw" number of values after the image width.
         padded_img = np.pad(img, ((0, 0), (0, ph), (0, pw)), 'reflect')
     inferred = net.run(np.expand_dims(padded_img, axis=0), width=w+pw, height=h+ph)
     # Crop back to original dimensions and convert to pixel values.
