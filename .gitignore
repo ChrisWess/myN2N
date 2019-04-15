@@ -3,4 +3,6 @@ dataset_records/
 prepare_dataset/dataset/
 __pycache__/
 dnnlib/__pycache__/
+/dnnlib/tflib/__pycache__/
+/dnnlib/submission/__pycache__/
 results/
