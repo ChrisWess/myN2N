@@ -62,6 +62,8 @@ def conv(name, x, fmaps, gain):
 
 
 def autoencoder(x, width=256, height=256, **_kwargs):
+    # Sets the shape of this tensor to 4 dimensions. 1st dimension is the number of input image crops.
+    # By default the image crops are defined to have the size 256*256. The other 3 dimensions are the CHW.
     x.set_shape([None, 3, height, width])
 
     skips = [x]  # Queue of resulting feature maps to be concatenated to the upscaling layers

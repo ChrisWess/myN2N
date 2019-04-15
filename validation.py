@@ -35,9 +35,8 @@ class ValidationSet:
             try:
                 # In this loop, open every image in the RGB format.
                 im = PIL.Image.open(fname).convert('RGB')
-                # Convert the image to numpy array
+                # Convert the image to numpy array in the shape HWC => (height, width, channel) => (h,w,3)
                 arr = np.array(im, dtype=np.float32)
-                print(arr.shape)  # TODO: [h,w,3] ?
                 # Converts HWC to CHW and normalizes color values to range [-0.5, 0.5]
                 reshaped = arr.transpose([2, 0, 1]) / 255.0 - 0.5
                 # Appends transformed image array to the list of all images.

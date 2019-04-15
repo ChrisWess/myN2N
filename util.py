@@ -52,13 +52,17 @@ def infer_image(net, img):
     """Run an image through the network (apply reflect padding when needed and crop back to original dimensions.)"""
     w = img.shape[2]
     h = img.shape[1]
-    pw, ph = (w+31)//32*32-w, (h+31)//32*32-h
+    # Calculates the padding for this image's width and height, so the total w and h are a multiple of 32.
+    pw, ph = ((w+31)//32)*32-w, ((h+31)//32)*32-h
     padded_img = img
     if pw != 0 or ph != 0:
         # (0, 0) => pad nothing in the channel axis
         # (0, ph) => pad nothing before the height, pad "ph" number of values after the image height.
         # (0, pw) => pad nothing before the width, pad "pw" number of values after the image width.
+        # reflect padding pads the values of the edge of the array in reverse order (as if the padding was a reflection)
         padded_img = np.pad(img, ((0, 0), (0, ph), (0, pw)), 'reflect')
+    # Expand a dimension at the start of this array to fit the dimension count of 4 (expected by network.run).
+    # TODO: check w+pw = padded_img.shape[2] and for height
     inferred = net.run(np.expand_dims(padded_img, axis=0), width=w+pw, height=h+ph)
     # Crop back to original dimensions and convert to pixel values.
     return clip_to_uint8(crop_np(inferred[0], 0, 0, w, h))

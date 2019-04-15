@@ -66,7 +66,7 @@ class Network:
         self.static_kwargs = util.EasyDict(static_kwargs)
 
         # Init build func.
-        self._build_func = func
+        self._build_func = func  # network.autoencoder in our example
         self._build_func_name = func.__name__
 
         # Init graph.
@@ -95,34 +95,43 @@ class Network:
         self._run_cache = dict()  # Cached graph data for Network.run().
 
     def _init_graph(self) -> None:
-        # Collect inputs.
+        # Collect inputs:
         self.input_names = []
 
         for param in inspect.signature(self._build_func).parameters.values():
             if param.kind == param.POSITIONAL_OR_KEYWORD and param.default is param.empty:
+                # Save the names of the parameter function that have no default value.
+                # This is/are the parameter/s of input values that define the input layer.
                 self.input_names.append(param.name)
 
+        # Define the number of input parameters and check that there are inputs:
         self.num_inputs = len(self.input_names)
         assert self.num_inputs >= 1
 
-        # Choose name and scope.
+        # Choose name and scope name:
         if self.name is None:
             self.name = self._build_func_name
 
         self.scope = tf.get_default_graph().unique_name(self.name.replace("/", "_"), mark_as_used=False)
 
-        # Build template graph.
+        # Build template graph:
+        # Use our scope as the variable context manager. It validates values are from the same graph,
+        # ensures that graph is the default graph, and pushes a name scope and a variable scope.
         with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
             assert tf.get_variable_scope().name == self.scope
 
             with tfutil.absolute_name_scope(self.scope):  # ignore surrounding name_scope
                 with tf.control_dependencies(None):  # ignore surrounding control_dependencies
+                    # Define a list of placeholders for every input parameter to the network.
                     self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
                     assert callable(self._build_func)
+                    # Define the build operation for this network by applying our placeholders as inputs and kwargs.
                     out_expr = self._build_func(*self.input_templates, is_template_graph=True, **self.static_kwargs)
 
         # Collect outputs.
         assert tfutil.is_tf_expression(out_expr) or isinstance(out_expr, tuple)
+        # Get the expression/tuple that produce our output values (the network ops).
+        # In this n2n network just one input/one output, but different architectures might have multiple.
         self.output_templates = [out_expr] if tfutil.is_tf_expression(out_expr) else list(out_expr)
         self.num_outputs = len(self.output_templates)
         assert self.num_outputs >= 1
@@ -134,13 +143,16 @@ class Network:
         if any(t.shape.ndims is None for t in self.output_templates):
             raise ValueError("Network output shapes not defined. Please call x.set_shape() where applicable.")
 
-        # Populate remaining fields.
+        # Populate remaining fields. Retrieve information about the input and output tensors.
         self.input_shapes = [tfutil.shape_to_list(t.shape) for t in self.input_templates]
         self.output_shapes = [tfutil.shape_to_list(t.shape) for t in self.output_templates]
         self.input_shape = self.input_shapes[0]
         self.output_shape = self.output_shapes[0]
         self.output_names = [t.name.split("/")[-1].split(":")[0] for t in self.output_templates]
+        # The variables are the weight and bias tensors. One tensor is one variable,
+        # even if it contains many weight params.
         self.vars = OrderedDict([(self.get_var_local_name(var), var) for var in tf.global_variables(self.scope + "/")])
+        # In our example we have only trainable variables.
         self.trainables = OrderedDict([(self.get_var_local_name(var), var) for var in tf.trainable_variables(self.scope + "/")])
 
     def reset_vars(self) -> None:
