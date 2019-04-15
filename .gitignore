@@ -1,4 +1,6 @@
+.idea/
 dataset_records/
 prepare_dataset/dataset/
 __pycache__/
+dnnlib/__pycache__/
 results/
