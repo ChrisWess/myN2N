@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import PIL.Image
 import tensorflow as tf
+from typing import Callable
 
 import dnnlib
 import dnnlib.submission.submit as submit
@@ -74,7 +75,7 @@ class ValidationSet:
 
 
 def validate(submit_config: submit.SubmitConfig, tf_config: dict, noise: dict, dataset: dict, network_snapshot: str):
-    noise_augmenter = dnnlib.util.call_func_by_name(**noise)
+    noise_augmenter = noise.func(**noise.func_kwargs)
     validation_set = ValidationSet(submit_config)
     validation_set.load(**dataset)
 

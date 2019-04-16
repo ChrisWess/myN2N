@@ -114,6 +114,7 @@ class Network:
         if self.name is None:
             self.name = self._build_func_name
 
+        # Return a unique operation name for name. -> func name "autoencoder" will also be the name of the scope.
         self.scope = tf.get_default_graph().unique_name(self.name.replace("/", "_"), mark_as_used=False)
 
         # Build template graph:
@@ -182,8 +183,10 @@ class Network:
             # Iterate over every expression with their associated name and input shape.
             for expr, name, shape in zip(in_expr, self.input_names, self.input_shapes):
                 if expr is not None:
-                    # TODO: identity, because you need to create an extra operation in the scope for this expression?
-                    expr = tf.identity(expr, name=name)
+                    # identity is useful when 1) naming unnamed ops, 2) when you want to explicitly transport tensor
+                    # between devices or 3) when you need an additional operation for the expression,
+                    # because of a context manager block (like tf.control_dependencies)
+                    expr = tf.identity(expr, name=name)  # Use identity probably because of 2)
                 else:
                     # expr is None: make a valid input tensor with all zeros.
                     expr = tf.zeros([tf.shape(valid_inputs[0])[0]] + shape[1:], name=name)
@@ -202,11 +205,13 @@ class Network:
     def get_var_local_name(self, var_or_global_name: Union[TfExpression, str]) -> str:
         """Get the local name of a given variable, excluding any surrounding name scopes."""
         assert tfutil.is_tf_expression(var_or_global_name) or isinstance(var_or_global_name, str)
+        # Get the name of the variable e.g. autoencoder/enc_conv0/weight:0
         global_name = var_or_global_name if isinstance(var_or_global_name, str) else var_or_global_name.name
         assert global_name.startswith(self.scope + "/")
+        # Cut off the scope name and slash at the beginning of the global name e.g. "autoencoder/"
         local_name = global_name[len(self.scope) + 1:]
-        local_name = local_name.split(":")[0]
-        return local_name
+        local_name = local_name.split(":")[0]  # split off the number at the name end.
+        return local_name  # Would be "enc_conv0/weight" for this example.
 
     def find_var(self, var_or_local_name: Union[TfExpression, str]) -> TfExpression:
         """Find variable by local or global name."""
