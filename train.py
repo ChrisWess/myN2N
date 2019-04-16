@@ -129,20 +129,24 @@ def train(
         # Placeholder for the learning rate. This will get ramped down dynamically.
         lrate_in = tf.placeholder(tf.float32, name='lrate_in', shape=[])
 
+        # Defines the expression(s) that creates the network input.
         noisy_input, noisy_target, clean_target = dataset_iter.get_next()
         noisy_input_split = tf.split(noisy_input, submit_config.num_gpus)
         noisy_target_split = tf.split(noisy_target, submit_config.num_gpus)  # Split over multiple GPUs
-        clean_target_split = tf.split(clean_target, submit_config.num_gpus)
+        # clean_target_split = tf.split(clean_target, submit_config.num_gpus)
 
     # Define the loss function using the Optimizer helper class, this will take care of multi GPU
     opt = Optimizer(learning_rate=lrate_in, **optimizer_config)
 
     for gpu in range(submit_config.num_gpus):
         with tf.device("/gpu:%d" % gpu):
+            # Create a clone for this network for other gpus to work on.
             net_gpu = net if gpu == 0 else net.clone()
 
+            # Create the output expression by giving the input expression into the network.
             denoised = net_gpu.get_output_for(noisy_input_split[gpu])
 
+            # Create the error function as the MSE between the target tensor and the denoised network output.
             meansq_error = tf.reduce_mean(tf.square(noisy_target_split[gpu] - denoised))
             # Create an autosummary that will average over all GPUs
             with tf.control_dependencies([autosummary("Loss", meansq_error)]):

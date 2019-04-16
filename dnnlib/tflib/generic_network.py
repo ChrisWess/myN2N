@@ -61,6 +61,7 @@ class Network:
         tfutil.assert_tf_initialized()
         assert isinstance(name, str) or name is None
         assert callable(func)  # must not be None
+        # Init class fields.
         self._init_fields()
         self.name = name
         self.static_kwargs = util.EasyDict(static_kwargs)
@@ -69,9 +70,10 @@ class Network:
         self._build_func = func  # network.autoencoder in our example
         self._build_func_name = func.__name__
 
-        # Init graph.
+        # Init graph with variables.
         self._init_graph()
         self.reset_vars()
+        # Initialization done. Graph and variables are ready to be trained.
 
     def _init_fields(self) -> None:
         self.name = None
@@ -156,7 +158,8 @@ class Network:
         self.trainables = OrderedDict([(self.get_var_local_name(var), var) for var in tf.trainable_variables(self.scope + "/")])
 
     def reset_vars(self) -> None:
-        """Run initializers for all variables defined by this network."""
+        """Run initializers for all variables defined by this network. The initializer is defined in our
+        network build function (autoencoder), when calling tf.get_variable."""
         tfutil.run([var.initializer for var in self.vars.values()])
 
     def reset_trainables(self) -> None:
@@ -173,15 +176,20 @@ class Network:
 
         with tf.variable_scope(self.scope, reuse=True):
             assert tf.get_variable_scope().name == self.scope
+            # Filter valid input expr and put them into a list.
             valid_inputs = [expr for expr in in_expr if expr is not None]
             final_inputs = []
+            # Iterate over every expression with their associated name and input shape.
             for expr, name, shape in zip(in_expr, self.input_names, self.input_shapes):
                 if expr is not None:
+                    # TODO: identity, because you need to create an extra operation in the scope for this expression?
                     expr = tf.identity(expr, name=name)
                 else:
+                    # expr is None: make a valid input tensor with all zeros.
                     expr = tf.zeros([tf.shape(valid_inputs[0])[0]] + shape[1:], name=name)
                 final_inputs.append(expr)
             assert callable(self._build_func)
+            # Actually defines the build function with the input expression instead of the placeholder.
             out_expr = self._build_func(*final_inputs, **all_kwargs)
 
         assert tfutil.is_tf_expression(out_expr) or isinstance(out_expr, tuple)
