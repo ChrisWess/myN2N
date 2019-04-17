@@ -134,7 +134,7 @@ if __name__ == "__main__":
             print('running with defaults in train_config')
 
         # Choose noise (default is gaussian)
-        noise = 'gaussian'
+        noise = 'text'
         if 'noise' in args:
             if args.noise not in corruption_types:
                 error('Unknown noise type', args.noise)

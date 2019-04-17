@@ -3,7 +3,6 @@ import numpy as np
 from numpy.random import randint
 import random
 import string
-from PIL import ImageDraw
 
 import dnnlib
 from dnnlib.tflib.optimizer import Optimizer
@@ -16,7 +15,7 @@ import dnnlib.util as util
 
 import util
 from validation import ValidationSet
-from dataset import create_dataset, tensor_to_image
+from dataset import create_dataset, create_image_tensor_manip, hwc_to_chw
 
 
 class AugmentGaussian:
@@ -61,36 +60,75 @@ class AugmentPoisson:
 class AugmentTextOverlays:
     def __init__(self, min_words, max_words, max_wordlength, fontsize):
         assert max_wordlength >= 3
+        assert max_words <= 255
         self.min_words = min_words
         self.max_words = max_words
         self.max_wl = max_wordlength
         self.range_fontsize = fontsize
 
     def add_train_noise_tf(self, x: tf.Tensor) -> tf.Tensor:
-        img = tensor_to_image(x)
-        self.overlay(img)
-        return tf.convert_to_tensor(util.image_to_array(img), tf.float32)
+        """Manipulates the given tensor by recoloring certain pixels. A same-sized array is build up from
+        an image with text drawn on it to retrieve the information which pixels should be colored."""
+        return create_image_tensor_manip(x, self._create_aug_tf, self.augment_tensor)
 
     def add_validation_noise_np(self, x: np.array) -> np.array:
+        """Create a PIL image from the array, draw text on it and transform it back to an array."""
         img = util.array_to_image(x)
-        self.overlay(img)
+        words = self._create_aug_info(img)
+        util.draw_text_on_image(img, words)
         return util.image_to_array(img)
 
-    def overlay(self, img):
+    def _create_aug_tf(self, img) -> np.array:
+        """Encodes a numpy array with the positions of the text pixel colors to apply them to the tensor."""
+        words_info = self._create_aug_info(img)
+        # Encodes color to a unique RGB value which increments per new word.
+        words_info_enc = []
+        # Real colors are saved to decode the unique placeholder color values.
+        colors = []
+        for i in range(len(words_info)):
+            size, pos, word, color = words_info[i]
+            words_info_enc.append((size, pos, word, (i, i, i)))
+            colors.append(color)
+
+        util.draw_text_on_image(img, words_info_enc)
+        arr = np.array(img, dtype=np.int8)
+        for x in range(arr.shape[0]):
+            for y in range(arr.shape[1]):
+                cval = arr[x, y, 0]
+                if cval == 0:
+                    arr[x, y, :] = [-1, -1, -1]
+                else:
+                    arr[x, y, :] = colors[cval]
+        return arr
+
+    def augment_tensor(self, x: tf.Tensor, arr: np.array) -> tf.Tensor:
+        """Change pixel values to color, if the corresponding array value has color."""
+        # TODO: array hat shape [3,256,3]
+        text_t = tf.convert_to_tensor(arr)
+        comparison = tf.equal(text_t, tf.constant(-1, dtype=tf.int8))
+        text_t = tf.cast(text_t, tf.float32) / 255.0 - 0.5
+        # tf.where chooses value of x where condition is true and y if false.
+        # Following means: if value in tensor with drawn text equals -1, use the value of the original tensor,
+        # else use the color value of the tensor with drawn text.
+        return tf.where(comparison, x=x, y=text_t)
+
+    def _create_aug_info(self, img) -> list:
+        """Configures the number of words, their fontsize, position, text (also length) and color."""
+        words = []
         width, height = img.size
-        draw = ImageDraw.Draw(img)
         wordcount = randint(self.min_words, self.max_words)
         for w in range(wordcount):
+            size = randint(self.range_fontsize[0], self.range_fontsize[1])
+
             wl = randint(3, self.max_wl)
             word = ''
             for x in range(wl):
                 word += random.choice(string.ascii_letters)
 
             pos = (randint(0, width), randint(0, height))
-            size = randint(self.range_fontsize[0], self.range_fontsize[1])
             color = tuple(randint(0, 255, 3))
-            # Draws a word with the given styling on the image with the ImageDraw object.
-            util.draw_text_on_image(draw, word, pos, size, color)
+            words.append((size, pos, word, color))
+        return words
 
 
 def compute_ramped_down_lrate(i, iteration_count, ramp_down_perc, learning_rate):

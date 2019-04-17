@@ -3,9 +3,7 @@ import sys
 import numpy as np
 import PIL.Image
 import tensorflow as tf
-from typing import Callable
 
-import dnnlib
 import dnnlib.submission.submit as submit
 from dnnlib.submission.run_context import RunContext
 import dnnlib.tflib.tfutil as tfutil

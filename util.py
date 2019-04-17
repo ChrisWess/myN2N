@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pickle
-from PIL import Image, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 
 def save_snapshot(submit_config, net, fname_postfix):
@@ -20,11 +20,6 @@ def load_snapshot(fname):
 def save_image(submit_config, img_np, filename):
     """Converts a given image tensor to an image and saves it to the specified file name."""
     array_to_image(img_np).save(os.path.join(submit_config.results_dir, filename))
-
-
-def draw_text_on_image(img_draw, word, position, fontsize, color):
-    font = ImageFont.truetype("LiberationSans-Regular.ttf", fontsize)
-    img_draw.text(position, word, color, font=font)
 
 
 def array_to_image(img_np):
@@ -51,12 +46,12 @@ def clip_to_uint8(arr):
     return np.clip((arr + 0.5) * 255.0 + 0.5, 0, 255).astype(np.uint8)
 
 
-def crop_np(img, x, y, w, h):
-    """Crops a numpy array image.
-    First slicing dimension: All color channels are of course kept when cropping.
-    Second slicing dimension: Get only values with height >=y and <h.
-    Third slicing dimension: Get only values with width >=x and <w."""
-    return img[:, y:h, x:w]
+def draw_text_on_image(img: Image, words_info: list) -> None:
+    """Draws words with the given styling on the PIL image with the ImageDraw object."""
+    draw = ImageDraw.Draw(img)
+    for winfo in words_info:
+        font = ImageFont.truetype("LiberationSans-Regular.ttf", winfo[0])
+        draw.text(winfo[1], winfo[2], winfo[3], font=font)
 
 
 def infer_image(net, img):
@@ -77,3 +72,11 @@ def infer_image(net, img):
     inferred = net.run(np.expand_dims(padded_img, axis=0), width=w+pw, height=h+ph)
     # Crop back to original dimensions and convert to pixel values.
     return clip_to_uint8(crop_np(inferred[0], 0, 0, w, h))
+
+
+def crop_np(img, x, y, w, h):
+    """Crops a numpy array image.
+    First slicing dimension: All color channels are of course kept when cropping.
+    Second slicing dimension: Get only values with height >=y and <h.
+    Third slicing dimension: Get only values with width >=x and <w."""
+    return img[:, y:h, x:w]
