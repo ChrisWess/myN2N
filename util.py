@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pickle
-import PIL.Image
+from PIL import Image, ImageFont
 
 
 def save_snapshot(submit_config, net, fname_postfix):
@@ -17,20 +17,31 @@ def load_snapshot(fname):
         return pickle.load(f)
 
 
-def save_image(submit_config, img_t, filename):
+def save_image(submit_config, img_np, filename):
     """Converts a given image tensor to an image and saves it to the specified file name."""
-    array_to_image(img_t).save(os.path.join(submit_config.results_dir, filename))
+    array_to_image(img_np).save(os.path.join(submit_config.results_dir, filename))
 
 
-def array_to_image(img_t):
-    """convert the image tensor to a PIL image"""
-    t = img_t.transpose([1, 2, 0])  # [RGB, H, W] -> [H, W, RGB]
-    if t.dtype in [np.float32, np.float64]:
-        # transform pixel color data to color values in the usual byte representation (uint8).
-        t = clip_to_uint8(t)
+def draw_text_on_image(img_draw, word, position, fontsize, color):
+    font = ImageFont.truetype("LiberationSans-Regular.ttf", fontsize)
+    img_draw.text(position, word, color, font=font)
+
+
+def array_to_image(img_np):
+    """Converts the image array to a PIL image."""
+    arr = img_np.transpose([1, 2, 0])  # [RGB, H, W] -> [H, W, RGB]
+    if arr.dtype in [np.float32, np.float64]:
+        # Transform pixel color data to color values in the usual byte representation (uint8).
+        arr = clip_to_uint8(arr)
     else:
-        assert t.dtype == np.uint8
-    return PIL.Image.fromarray(t, 'RGB')
+        assert arr.dtype == np.uint8
+    return Image.fromarray(arr, 'RGB')
+
+
+def image_to_array(image_pil):
+    """Converts the PIL image to an image array with our desired format: CHW and normalized to [-0.5,0.5]"""
+    arr = np.array(image_pil, dtype=np.uint8)
+    return arr.transpose([2, 0, 1]).astype(np.float32) / 255.0 - 0.5
 
 
 def clip_to_uint8(arr):

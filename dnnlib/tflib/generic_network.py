@@ -271,12 +271,12 @@ class Network:
         return net
 
     def copy_vars_from(self, src_net: "Network") -> None:
-        """Copy the values of all variables from the given network."""
+        """Copy the values of all variables from the given network to this one."""
         names = [name for name in self.vars.keys() if name in src_net.vars]
         tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[name] for name in names}))
 
     def copy_trainables_from(self, src_net: "Network") -> None:
-        """Copy the values of all trainable variables from the given network."""
+        """Copy the values of all trainable variables from the given network to this one."""
         names = [name for name in self.trainables.keys() if name in src_net.trainables]
         tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[name] for name in names}))
 

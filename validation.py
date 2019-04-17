@@ -55,6 +55,7 @@ class ValidationSet:
             h = orig_img.shape[1]
 
             noisy_img = noise_func(orig_img)
+            # infer_image runs the numpy array through the network.
             pred255 = util.infer_image(net, noisy_img)
             orig255 = util.clip_to_uint8(orig_img)
             assert (pred255.shape[2] == w and pred255.shape[1] == h)
@@ -95,6 +96,7 @@ def infer_image(tf_config: dict, network_snapshot: str, image: str, out_image: s
     im = PIL.Image.open(image).convert('RGB')
     arr = np.array(im, dtype=np.float32)
     reshaped = arr.transpose([2, 0, 1]) / 255.0 - 0.5
+    # infer_image runs the numpy array through the network.
     pred255 = util.infer_image(net, reshaped)
     t = pred255.transpose([1, 2, 0])  # [RGB, H, W] -> [H, W, RGB]
     PIL.Image.fromarray(t, 'RGB').save(os.path.join(out_image))

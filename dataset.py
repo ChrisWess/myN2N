@@ -1,5 +1,7 @@
 import tensorflow as tf
 from typing import Callable
+import PIL.Image
+from dnnlib.tflib import tfutil
 
 
 def parse_tfrecord_tf(record):
@@ -26,6 +28,17 @@ def hwc_to_chw(x):
     return tf.transpose(x, perm=[2, 0, 1])
 
 
+def tensor_to_image(img_t):
+    """Convert the image tensor to a PIL image. Tensorflow equivalent to util.array_to_image ."""
+    t = chw_to_hwc(img_t)
+    if t.dtype in [tf.float32, tf.float64]:
+        t = tf.cast(tf.clip_by_value((t + 0.5) * 255.0 + 0.5, 0, 255), tf.uint8)
+    else:
+        assert t.dtype == tf.uint8
+    arr = tfutil.run(t)
+    return PIL.Image.fromarray(arr, 'RGB')
+
+
 def resize_small_image(x):
     """If the image is smaller than 256*256, extend it to fit to the size of 256*256."""
     shape = tf.shape(x)
@@ -46,7 +59,8 @@ def random_crop_noised_clean(x: tf.Tensor, add_noise: Callable) -> tuple:
     result means: noisy input, noisy target, clean target."""
     # Randomly crops an 256*256 image to fit into the input layer and normalizes RGB pixel values.
     cropped = tf.random_crop(resize_small_image(x), size=[3, 256, 256]) / 255.0 - 0.5
-    # TODO: Make more crops as training data.
+    # More crops not really necessary, because we create a different random crop with different random noise
+    # for every image at every iteration.
     return add_noise(cropped), add_noise(cropped), cropped
 
 

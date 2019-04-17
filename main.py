@@ -54,6 +54,15 @@ poisson_noise_config = util.EasyDict(
         validation_chi=30.0
     )
 )
+text_noise_config = util.EasyDict(
+    func=train.AugmentTextOverlays,
+    func_kwargs=util.EasyDict(
+        min_words=50,
+        max_words=100,
+        max_wordlength=30,
+        fontsize=(15, 25)
+    )
+)
 
 # ------------------------------------------------------------------------------------------
 # Preconfigured validation sets
@@ -61,7 +70,8 @@ validation_config = util.EasyDict(dataset_dir='prepare_dataset/dataset')
 
 corruption_types = {
     'gaussian': gaussian_noise_config,
-    'poisson': poisson_noise_config
+    'poisson': poisson_noise_config,
+    'text': text_noise_config
 }
 
 # Default train config
@@ -75,8 +85,6 @@ train_config = util.EasyDict(
     learning_rate=0.0003,
     ramp_down_perc=0.3,
     noise=gaussian_noise_config,
-#    noise=poisson_noise_config,
-#    noise2noise=True,
     train_tfrecords='dataset_records/train.tfrecords',
     tf_config=tf_config,
     net_config=net_config,

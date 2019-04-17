@@ -1,5 +1,9 @@
 ﻿import tensorflow as tf
 import numpy as np
+from numpy.random import randint
+import random
+import string
+from PIL import ImageDraw
 
 import dnnlib
 from dnnlib.tflib.optimizer import Optimizer
@@ -10,9 +14,9 @@ import dnnlib.submission.submit as submit
 import dnnlib.submission.run_context as run_context
 import dnnlib.util as util
 
-from util import save_image, save_snapshot
+import util
 from validation import ValidationSet
-from dataset import create_dataset
+from dataset import create_dataset, tensor_to_image
 
 
 class AugmentGaussian:
@@ -54,19 +58,39 @@ class AugmentPoisson:
         return np.random.poisson(self.validation_chi * (x + 0.5)) / self.validation_chi - 0.5
 
 
-"""
-Probably not possible here!
 class AugmentTextOverlays:
-    def __init__(self, max_words, max_wordlength, fontsize):
+    def __init__(self, min_words, max_words, max_wordlength, fontsize):
+        assert max_wordlength >= 3
+        self.min_words = min_words
         self.max_words = max_words
         self.max_wl = max_wordlength
         self.range_fontsize = fontsize
 
     def add_train_noise_tf(self, x: tf.Tensor) -> tf.Tensor:
-        print("todo")
+        img = tensor_to_image(x)
+        self.overlay(img)
+        return tf.convert_to_tensor(util.image_to_array(img), tf.float32)
 
     def add_validation_noise_np(self, x: np.array) -> np.array:
-        print("todo")"""
+        img = util.array_to_image(x)
+        self.overlay(img)
+        return util.image_to_array(img)
+
+    def overlay(self, img):
+        width, height = img.size
+        draw = ImageDraw.Draw(img)
+        wordcount = randint(self.min_words, self.max_words)
+        for w in range(wordcount):
+            wl = randint(3, self.max_wl)
+            word = ''
+            for x in range(wl):
+                word += random.choice(string.ascii_letters)
+
+            pos = (randint(0, width), randint(0, height))
+            size = randint(self.range_fontsize[0], self.range_fontsize[1])
+            color = tuple(randint(0, 255, 3))
+            # Draws a word with the given styling on the image with the ImageDraw object.
+            util.draw_text_on_image(draw, word, pos, size, color)
 
 
 def compute_ramped_down_lrate(i, iteration_count, ramp_down_perc, learning_rate):
@@ -135,6 +159,9 @@ def train(
         noisy_target_split = tf.split(noisy_target, submit_config.num_gpus)  # Split over multiple GPUs
         # clean_target_split = tf.split(clean_target, submit_config.num_gpus)
 
+    # --------------------------------------------------------------------------------------------
+    # Optimizer initialization and setup:
+
     # Define the loss function using the Optimizer helper class, this will take care of multi GPU
     opt = Optimizer(learning_rate=lrate_in, **optimizer_config)
 
@@ -158,6 +185,9 @@ def train(
     summary_log = tf._api.v1.summary.FileWriter(submit_config.results_dir)
     summary_log.add_graph(tf.get_default_graph())
 
+    # --------------------------------------------------------------------------------------------
+    # Training and some milestone evaluation starts:
+
     print('Training...')
     time_maintenance = ctx.get_time_since_last_update()
     ctx.update()  # TODO: why parameterized in reference?
@@ -175,13 +205,15 @@ def train(
             time_total = ctx.get_time_since_start()
 
             # Evaluate 'x' to draw one minbatch of inputs. Executes the operations defined in the dataset iterator.
+            # Evals the noisy input and clean target minibatch Tensor ops to numpy array of the minibatch.
             [source_mb, target_mb] = tfutil.run([noisy_input, clean_target])
             # Runs the noisy images through the network without training it. It is just for observing/evaluating.
+            # net.run expects numpy arrays to run through this network.
             denoised = net.run(source_mb)
             # array shape: [minibatch_size, channel_size, height, width]
-            save_image(submit_config, denoised[0], "img_{0}_y_pred.png".format(i))
-            save_image(submit_config, target_mb[0], "img_{0}_y.png".format(i))
-            save_image(submit_config, source_mb[0], "img_{0}_x_aug.png".format(i))
+            util.save_image(submit_config, denoised[0], "img_{0}_y_pred.png".format(i))
+            util.save_image(submit_config, target_mb[0], "img_{0}_y.png".format(i))
+            util.save_image(submit_config, source_mb[0], "img_{0}_x_aug.png".format(i))
 
             validation_set.evaluate(net, i, noise_augmenter.add_validation_noise_np)
 
@@ -201,7 +233,7 @@ def train(
         tfutil.run([train_step], {lrate_in: lrate})  # Run the training update through the network in our session.
 
     print("Elapsed time: {0}".format(util.format_time(ctx.get_time_since_start())))
-    save_snapshot(submit_config, net, 'final')
+    util.save_snapshot(submit_config, net, 'final')
 
     # Summary log and context should be closed at the end
     summary_log.close()
