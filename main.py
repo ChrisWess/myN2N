@@ -57,9 +57,9 @@ poisson_noise_config = util.EasyDict(
 text_noise_config = util.EasyDict(
     func=train.AugmentTextOverlays,
     func_kwargs=util.EasyDict(
-        min_words=50,
-        max_words=100,
-        max_wordlength=30,
+        min_words=10,
+        max_words=15,
+        max_wordlength=10,
         fontsize=(15, 25)
     )
 )

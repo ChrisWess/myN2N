@@ -55,7 +55,8 @@ def random_crop_noised_clean(x: tf.Tensor, add_noise: Callable) -> tuple:
 
 def create_image_tensor_manip(x: tf.Tensor, encode_img: Callable, transform_tensor: Callable):
     # tf.shape() gives the dynamic shape. x.get_shape() the static shape.
-    shape = x.get_shape()
+    shape = list(x.get_shape())
+    shape[0], shape[-1] = shape[-1], shape[0]
     empty_arr = np.zeros(shape, np.uint8)
     img = Image.fromarray(empty_arr, 'RGB')
     encoded_arr = encode_img(img)
