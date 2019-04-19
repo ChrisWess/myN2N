@@ -15,9 +15,8 @@ import dnnlib.util as dutil
 
 import util
 from validation import ValidationSet
-from dataset import create_dataset, create_image_tensor_manip, hwc_to_chw
+from dataset import create_dataset
 
-from PIL import Image
 
 class AugmentGaussian:
     def __init__(self, validation_stddev, train_stddev_rng_range):
@@ -67,67 +66,19 @@ class AugmentTextOverlays:
         self.range_fontsize = fontsize
 
     def add_train_noise_tf(self, x: tf.Tensor) -> tf.Tensor:
-        """Manipulates the given tensor by recoloring certain pixels. A same-sized array is build up from
-        an image with text drawn on it to retrieve the information which pixels should be colored."""
-        return create_image_tensor_manip(x, self._create_aug_tf, self.augment_tensor)
+        """Train noise must already be present in the tfrecords."""
+        return x
 
     def add_validation_noise_np(self, x: np.array) -> np.array:
         """Create a PIL image from the array, draw text on it and transform it back to an array."""
         img = util.array_to_image(x)
-        words = self._create_aug_info(img, True)
+        words = self._create_aug_info_np(img)
         util.draw_text_on_image(img, words)
         return util.image_to_array(img)
 
-    def _create_aug_tf(self, img) -> np.array:
-        words_info = self._create_aug_info(img, False)
-        # color = words_info[0][3]
-        conf = 6
-        util.draw_text_on_image(img, words_info)
-        arr = np.array(img, dtype=np.int8)
-        arr[np.where((np.sum(arr, axis=2) <= conf))] = [-1, -1, -1]
-        # arr[np.where((np.sum(arr, axis=2) > conf))] = color
-        return arr
-
-    """def _create_aug_tf(self, img) -> np.array:
-        ""Encodes a numpy array with the positions of the text pixel colors to apply them to the tensor.""
-        words_info = self._create_aug_info(img)
-        # Encodes color to a unique RGB value which increments per new word.
-        words_info_enc = []
-        # Real colors are saved to decode the unique placeholder color values.
-        colors = dict()
-        conf_distance = 100
-        for i in range(len(words_info)):
-            size, pos, word, color = words_info[i]
-            cval = (i+1)*conf_distance
-            words_info_enc.append((size, pos, word, (cval, cval, cval)))
-            colors[cval] = color
-
-        util.draw_text_on_image(img, words_info_enc)
-        arr = np.array(img, dtype=np.int8)
-        for x in range(arr.shape[0]):
-            for y in range(arr.shape[1]):
-                cval = arr[x, y, 0]
-                if cval < conf_distance:
-                    arr[x, y, :] = [0, 0, 0]  # [-1, -1, -1]
-                else:
-                    arr[x, y, :] = colors[cval]
-        return arr"""
-
-    def augment_tensor(self, x: tf.Tensor, arr: np.array) -> tf.Tensor:
-        """Change pixel values to color, if the corresponding array value has color."""
-        text_t = hwc_to_chw(tf.convert_to_tensor(arr))
-        comparison = tf.less(text_t, tf.constant(0, dtype=tf.int8))
-        text_t = tf.clip_by_value(tf.cast(text_t, tf.float32), 0.0, 255.0) / 255.0 - 0.5
-        # tf.where chooses value of x where condition is true and y if false.
-        # Following means: if value in tensor with drawn text equals -1, use the value of the original tensor,
-        # else use the color value of the tensor with drawn text.
-        return tf.where(comparison, x=x, y=text_t)
-
-    def _create_aug_info(self, img, multi_color: bool) -> list:
+    def _create_aug_info_np(self, img) -> list:
         """Configures the number of words, their fontsize, position, text (also length) and color."""
         words = []
-        if not multi_color:
-            color = tuple(randint(0, 255, 3))
         width, height = img.size
         wordcount = randint(self.min_words, self.max_words)
         for w in range(wordcount):
@@ -139,8 +90,7 @@ class AugmentTextOverlays:
                 word += random.choice(string.ascii_letters)
 
             pos = (randint(0, width), randint(0, height))
-            if multi_color:
-                color = tuple(randint(0, 255, 3))
+            color = tuple(randint(0, 255, 3))
             words.append((size, pos, word, color))
         return words
 
